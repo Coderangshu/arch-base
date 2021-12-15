@@ -133,3 +133,44 @@ jobs:
 
           git clone "${git_clone_scripts_repo}" "${git_clone_scripts_dest}"
           "${git_clone_scripts_dest}/shell/arch/docker/testrunner.sh" --app-name ${{ steps.generate_app_name.outputs.app_name }} --image-name "ghcr.io/${{ github.repository }}:${{ steps.generate_temporary_tag_name.outputs.test_tag }}"
+      - name: Push Docker image to Docker Hub
+        uses: nick-invision/retry@v2.4.0
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          retry_wait_seconds: 120
+          command: |
+            docker push ${{ github.repository }}:latest
+            docker push ${{ github.repository }}:${{ steps.identify_github_release_tag_name.outputs.tag }}
+      - name: Push Docker image to GitHub Container Registry (GHCR)
+        uses: nick-invision/retry@v2.4.0
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          retry_wait_seconds: 120
+          command: |
+            docker push ghcr.io/${{ github.repository }}:latest
+            docker push ghcr.io/${{ github.repository }}:${{ steps.identify_github_release_tag_name.outputs.tag }}
+      - name: Push Docker image to GitLab Container Registry (GCR)
+        uses: nick-invision/retry@v2.4.0
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          retry_wait_seconds: 120
+          command: |
+            docker push registry.gitlab.com/${{ github.repository }}:latest
+            docker push registry.gitlab.com/${{ github.repository }}:${{ steps.identify_github_release_tag_name.outputs.tag }}
+      - name: Trigger build of int images
+        uses: nick-invision/retry@v2.4.0
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          retry_wait_seconds: 120
+          command: |
+            # construct array of repos to trigger builds for
+            declare -a int_repos_array=("arch-int-vpn" "arch-int-gui" "arch-devel")
+
+            # process repos and create release (triggers action to build)
+            for int_repo in "${int_repos_array[@]}"; do
+              curl -v -i -X POST -H "Content-Type:application/json" -H "Authorization: token ${{ secrets.TDB_PAT }}" "https://api.github.com/repos/binhex/${int_repo}/releases" -d '{"tag_name": "'${{ steps.generate_int_tag_name.outputs.int_tag }}'","target_commitish": "master","name": "API/URL triggered release","body": "'${{ steps.generate_int_tag_name.outputs.int_tag }}'","draft": false,"prerelease": false}'
+            done
