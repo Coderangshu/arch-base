@@ -4,7 +4,7 @@
 set -e
 
 # set arch for base image
-OS_ARCH="x86-64"
+OS_ARCH="aarch64"
 
 # construct snapshot date (cannot use todays as archive wont exist) and set url for archive.
 # note: for arch linux arm archive repo that the snapshot date has to be at least 2 days
